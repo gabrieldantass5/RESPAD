@@ -7,7 +7,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from sse_starlette.sse import EventSourceResponse
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from docx import Document
 from docx.shared import Pt, RGBColor, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -16,11 +17,8 @@ from system_prompt import SYSTEM_PROMPT
 
 load_dotenv()
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-model = genai.GenerativeModel(
-    model_name="gemini-2.5-flash-lite-preview-06-17",
-    system_instruction=SYSTEM_PROMPT
-)
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+MODEL = "gemini-2.0-flash"
 
 app = FastAPI(title="Assistente RESPAD/CBMAL")
 app.mount("/assets", StaticFiles(directory="assets"), name="assets")
@@ -34,26 +32,30 @@ async def chat(request: Request):
     body = await request.json()
     messages = body.get("messages", [])
 
-    # Convert history to Gemini format
+    # Converter histórico para formato google-genai
     history = []
     for msg in messages[:-1]:
-        history.append({
-            "role": "user" if msg["role"] == "user" else "model",
-            "parts": [msg["content"]]
-        })
+        role = "user" if msg["role"] == "user" else "model"
+        history.append(types.Content(role=role, parts=[types.Part(text=msg["content"])]))
 
     user_message = messages[-1]["content"] if messages else ""
-
-    chat_session = model.start_chat(history=history)
 
     async def generate():
         try:
             def stream_sync():
-                return list(chat_session.send_message(user_message, stream=True))
+                chat_session = client.chats.create(
+                    model=MODEL,
+                    config=types.GenerateContentConfig(
+                        system_instruction=SYSTEM_PROMPT,
+                        temperature=0.7,
+                    ),
+                    history=history,
+                )
+                return list(chat_session.send_message_stream(user_message))
 
             chunks = await asyncio.to_thread(stream_sync)
             for chunk in chunks:
-                if hasattr(chunk, "text") and chunk.text:
+                if chunk.text:
                     yield {"data": json.dumps({"text": chunk.text})}
         except Exception as e:
             yield {"data": json.dumps({"text": f"[ERRO] {str(e)}"})}
@@ -69,7 +71,6 @@ async def export_doc(request: Request):
 
     doc = Document()
 
-    # Page setup
     section = doc.sections[0]
     section.page_width = Inches(8.27)
     section.page_height = Inches(11.69)
@@ -78,7 +79,6 @@ async def export_doc(request: Request):
     section.top_margin = Inches(0.98)
     section.bottom_margin = Inches(0.98)
 
-    # Header with brasao
     header = doc.sections[0].header
     header_para = header.paragraphs[0]
     header_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -87,21 +87,18 @@ async def export_doc(request: Request):
     if brasao_path.exists():
         run.add_picture(str(brasao_path), width=Inches(0.6))
 
-    # Red separator line
     header_para2 = header.add_paragraph()
     header_para2.paragraph_format.space_before = Pt(4)
     border_run = header_para2.add_run("─" * 80)
     border_run.font.color.rgb = RGBColor(0xC1, 0x0A, 0x0A)
     border_run.font.size = Pt(8)
 
-    # Document title
     title_para = doc.add_heading(title, level=1)
     title_para.runs[0].font.color.rgb = RGBColor(0xC1, 0x0A, 0x0A)
     title_para.runs[0].font.name = "Calibri"
 
     doc.add_paragraph()
 
-    # Add assistant responses only
     for msg in messages:
         if msg["role"] == "assistant":
             para = doc.add_paragraph(msg["content"])
@@ -109,7 +106,6 @@ async def export_doc(request: Request):
             para.runs[0].font.name = "Calibri"
             doc.add_paragraph()
 
-    # Footer
     footer = doc.sections[0].footer
     footer_para = footer.paragraphs[0]
     footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -119,7 +115,6 @@ async def export_doc(request: Request):
     footer_run.font.size = Pt(8)
     footer_run.font.color.rgb = RGBColor(0x66, 0x66, 0x66)
 
-    # Save to temp file and return
     with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
         doc.save(tmp.name)
         tmp_path = tmp.name
