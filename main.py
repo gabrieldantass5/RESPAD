@@ -1,5 +1,6 @@
 import os
 import json
+import asyncio
 from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
@@ -17,7 +18,7 @@ load_dotenv()
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 model = genai.GenerativeModel(
-    model_name="gemini-2.0-flash",
+    model_name="gemini-1.5-flash",
     system_instruction=SYSTEM_PROMPT
 )
 
@@ -46,10 +47,16 @@ async def chat(request: Request):
     chat_session = model.start_chat(history=history)
 
     async def generate():
-        response = chat_session.send_message(user_message, stream=True)
-        for chunk in response:
-            if chunk.text:
-                yield {"data": json.dumps({"text": chunk.text})}
+        try:
+            def stream_sync():
+                return list(chat_session.send_message(user_message, stream=True))
+
+            chunks = await asyncio.to_thread(stream_sync)
+            for chunk in chunks:
+                if hasattr(chunk, "text") and chunk.text:
+                    yield {"data": json.dumps({"text": chunk.text})}
+        except Exception as e:
+            yield {"data": json.dumps({"text": f"[ERRO] {str(e)}"})}
         yield {"data": json.dumps({"done": True})}
 
     return EventSourceResponse(generate())
