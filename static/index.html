@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RESPAD · Assistente CBMAL</title>
+
+  <!-- Google Fonts: Exo 2 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Exo+2:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- DaisyUI CDN -->
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" />
+
+  <!-- Marked.js -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
+
+  <style>
+    /* ─── Base font ─── */
+    * {
+      font-family: 'Exo 2', sans-serif;
+      box-sizing: border-box;
+    }
+
+    /* ─── Scrollbar ─── */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: #0f0f1a; }
+    ::-webkit-scrollbar-thumb { background: #C10A0A; border-radius: 2px; }
+    ::-webkit-scrollbar-thumb:hover { background: #e01010; }
+
+    /* ─── Layout ─── */
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      background: #0f0f1a;
+      color: #e2e8f0;
+      overflow: hidden;
+    }
+
+    #app {
+      display: flex;
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+    }
+
+    /* ─── Sidebar ─── */
+    #sidebar {
+      width: 260px;
+      min-width: 260px;
+      background: #1a1a2e;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid rgba(193,10,10,0.25);
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    /* ─── Main chat area ─── */
+    #main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #0f0f1a;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    /* ─── Sidebar items ─── */
+    .sidebar-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.18s, color 0.18s;
+      color: #c4c4d4;
+      font-size: 0.875rem;
+      font-weight: 500;
+      margin: 1px 0;
+      user-select: none;
+    }
+    .sidebar-item:hover {
+      background: rgba(193,10,10,0.15);
+      color: #fff;
+    }
+    .sidebar-item.active {
+      background: #C10A0A;
+      color: #fff;
+    }
+    .sidebar-item svg {
+      flex-shrink: 0;
+      width: 17px;
+      height: 17px;
+      opacity: 0.8;
+    }
+    .sidebar-item.active svg { opacity: 1; }
+
+    .sidebar-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #555570;
+      padding: 14px 14px 4px;
+      user-select: none;
+    }
+
+    /* ─── Top bar ─── */
+    #topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      background: rgba(26,26,46,0.6);
+      backdrop-filter: blur(8px);
+      flex-shrink: 0;
+    }
+
+    /* ─── Chat container ─── */
+    #chat-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    /* ─── Chat bubbles override ─── */
+    .chat-bubble-assistant {
+      background: #1e1e2e !important;
+      color: #e2e8f0 !important;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .chat-bubble-user {
+      background: #C10A0A !important;
+      color: #fff !important;
+    }
+
+    /* ─── Typing indicator ─── */
+    .typing-indicator {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 12px 16px;
+    }
+    .typing-indicator span {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #C10A0A;
+      display: inline-block;
+      animation: bounce 1.2s infinite ease-in-out;
+    }
+    .typing-indicator span:nth-child(1) { animation-delay: 0s; }
+    .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes bounce {
+      0%, 80%, 100% { transform: translateY(0); opacity: 0.5; }
+      40% { transform: translateY(-7px); opacity: 1; }
+    }
+
+    /* ─── Input area ─── */
+    #input-area {
+      padding: 14px 20px 18px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      background: rgba(15,15,26,0.95);
+      flex-shrink: 0;
+    }
+
+    #input-wrapper {
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      background: #1e1e2e;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 10px 14px;
+      transition: border-color 0.2s;
+    }
+    #input-wrapper:focus-within {
+      border-color: #C10A0A;
+    }
+
+    #msg-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      resize: none;
+      color: #e2e8f0;
+      font-size: 0.9rem;
+      line-height: 1.5;
+      max-height: 160px;
+      overflow-y: auto;
+      min-height: 24px;
+    }
+    #msg-input::placeholder { color: #555570; }
+
+    #send-btn {
+      background: #C10A0A;
+      border: none;
+      border-radius: 8px;
+      width: 38px;
+      height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.18s, transform 0.1s;
+      flex-shrink: 0;
+    }
+    #send-btn:hover { background: #e01010; }
+    #send-btn:active { transform: scale(0.95); }
+    #send-btn:disabled { background: #444; cursor: not-allowed; }
+
+    /* ─── Welcome card ─── */
+    #welcome-card {
+      margin: auto;
+      text-align: center;
+      max-width: 520px;
+      padding: 32px 24px;
+    }
+
+    /* ─── Markdown prose ─── */
+    .prose-custom { line-height: 1.7; }
+    .prose-custom h1, .prose-custom h2, .prose-custom h3 {
+      color: #FF8000;
+      font-weight: 700;
+      margin: 1em 0 0.4em;
+    }
+    .prose-custom h1 { font-size: 1.3em; }
+    .prose-custom h2 { font-size: 1.15em; }
+    .prose-custom h3 { font-size: 1.05em; }
+    .prose-custom p { margin: 0.5em 0; }
+    .prose-custom ul, .prose-custom ol { padding-left: 1.4em; margin: 0.4em 0; }
+    .prose-custom li { margin: 0.2em 0; }
+    .prose-custom strong { color: #FF8000; font-weight: 700; }
+    .prose-custom em { color: #c9a0ff; }
+    .prose-custom code {
+      background: #0f0f1a;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 0.85em;
+      font-family: 'Courier New', monospace;
+      color: #7dd3fc;
+    }
+    .prose-custom pre {
+      background: #0f0f1a;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      padding: 14px;
+      overflow-x: auto;
+      margin: 0.6em 0;
+    }
+    .prose-custom pre code {
+      background: transparent;
+      border: none;
+      padding: 0;
+      color: #a5f3fc;
+      font-size: 0.82em;
+    }
+    .prose-custom table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0.8em 0;
+      font-size: 0.875em;
+    }
+    .prose-custom th {
+      background: #C10A0A;
+      color: #fff;
+      padding: 8px 12px;
+      text-align: left;
+      font-weight: 600;
+    }
+    .prose-custom td {
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      padding: 7px 12px;
+    }
+    .prose-custom tr:nth-child(even) td { background: rgba(255,255,255,0.03); }
+    .prose-custom blockquote {
+      border-left: 3px solid #FF8000;
+      margin: 0.6em 0;
+      padding: 4px 14px;
+      color: #a0a0c0;
+      font-style: italic;
+    }
+    .prose-custom hr {
+      border: none;
+      border-top: 1px solid rgba(255,255,255,0.1);
+      margin: 1em 0;
+    }
+    .prose-custom a { color: #FF8000; text-decoration: underline; }
+
+    /* ─── Badge shortcuts ─── */
+    .shortcut-badge {
+      display: inline-block;
+      padding: 5px 14px;
+      border-radius: 20px;
+      border: 1px solid rgba(193,10,10,0.4);
+      background: rgba(193,10,10,0.1);
+      color: #e2e8f0;
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: background 0.18s, border-color 0.18s;
+      margin: 3px;
+    }
+    .shortcut-badge:hover {
+      background: rgba(193,10,10,0.3);
+      border-color: #C10A0A;
+      color: #fff;
+    }
+
+    /* ─── Export button hidden by default ─── */
+    #export-btn { display: none; }
+    #export-btn.visible { display: flex; }
+
+    /* ─── Gemini status dot ─── */
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+      display: inline-block;
+      box-shadow: 0 0 6px #22c55e;
+      animation: pulse-dot 2s infinite;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; box-shadow: 0 0 6px #22c55e; }
+      50% { opacity: 0.6; box-shadow: 0 0 12px #22c55e; }
+    }
+  </style>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            cbmal: { red: '#C10A0A', gold: '#FF8000' }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ═══════════════════════════════ SIDEBAR ═══════════════════════════════ -->
+  <aside id="sidebar">
+
+    <!-- Logo / header -->
+    <div class="flex flex-col items-center py-6 px-4 gap-2 border-b border-white/5">
+      <img src="/assets/brasao.png" alt="Brasão CBMAL" class="w-16 h-16 object-contain drop-shadow-lg" onerror="this.style.display='none'" />
+      <div class="text-center mt-1">
+        <div class="text-lg font-extrabold tracking-widest text-white">RESPAD</div>
+        <div class="text-xs font-medium text-gray-400 tracking-wide">Assistente CBMAL</div>
+      </div>
+    </div>
+
+    <!-- Nav -->
+    <nav class="flex-1 px-3 py-3">
+
+      <!-- Início -->
+      <div class="sidebar-item active" id="nav-inicio" onclick="clearChat()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+        </svg>
+        Início
+      </div>
+
+      <!-- DOCUMENTOS -->
+      <div class="sidebar-label">Documentos</div>
+
+      <div class="sidebar-item" id="nav-plano" onclick="selectDoc('plano')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+        </svg>
+        Plano de Operações
+      </div>
+
+      <div class="sidebar-item" id="nav-ordem" onclick="selectDoc('ordem')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+        </svg>
+        Ordem SCI
+      </div>
+
+      <div class="sidebar-item" id="nav-aar" onclick="selectDoc('aar')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+        Relatório AAR
+      </div>
+
+      <div class="sidebar-item" id="nav-caso" onclick="selectDoc('caso')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        Caso Prático
+      </div>
+
+      <div class="sidebar-item" id="nav-aula" onclick="selectDoc('aula')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+        </svg>
+        Material Didático
+      </div>
+
+      <!-- FERRAMENTAS -->
+      <div class="sidebar-label">Ferramentas</div>
+
+      <div class="sidebar-item" onclick="clearChat()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/>
+        </svg>
+        Nova Conversa
+      </div>
+
+      <div class="sidebar-item" id="export-btn" onclick="exportDoc()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Exportar .docx
+      </div>
+
+    </nav>
+
+    <!-- Footer -->
+    <div class="px-4 py-4 border-t border-white/5 text-center">
+      <span class="text-xs text-gray-600 font-medium tracking-wide">CBMAL · RESPAD 2026</span>
+    </div>
+
+  </aside>
+
+  <!-- ═══════════════════════════════ MAIN ═══════════════════════════════ -->
+  <div id="main">
+
+    <!-- Top bar -->
+    <div id="topbar">
+      <div class="flex items-center gap-2">
+        <span class="text-xs text-gray-500">Assistente RESPAD</span>
+        <span class="text-gray-600 text-xs">›</span>
+        <span id="page-title" class="text-sm font-semibold text-white">Início</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="status-dot"></span>
+        <span class="text-xs text-gray-400 font-medium">Gemini conectado</span>
+      </div>
+    </div>
+
+    <!-- Chat messages -->
+    <div id="chat-container">
+
+      <!-- Welcome card (shown on load) -->
+      <div id="welcome-card">
+        <img src="/assets/brasao.png" alt="CBMAL" class="w-20 h-20 object-contain mx-auto mb-4 drop-shadow-lg" onerror="this.style.display='none'" />
+        <h1 class="text-2xl font-extrabold text-white mb-1">Olá, sou o RESPAD</h1>
+        <p class="text-gray-400 text-sm mb-6">Seu assistente inteligente para documentação operacional do <span class="text-orange-400 font-semibold">CBMAL</span>. Selecione um documento ou faça uma pergunta.</p>
+        <div class="flex flex-wrap justify-center gap-1">
+          <span class="shortcut-badge" onclick="selectDoc('plano')">📋 Plano de Operações</span>
+          <span class="shortcut-badge" onclick="selectDoc('ordem')">📄 Ordem SCI</span>
+          <span class="shortcut-badge" onclick="selectDoc('aar')">📊 Relatório AAR</span>
+          <span class="shortcut-badge" onclick="selectDoc('caso')">🎯 Caso Prático</span>
+          <span class="shortcut-badge" onclick="selectDoc('aula')">📚 Material Didático</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Input area -->
+    <div id="input-area">
+      <div id="input-wrapper">
+        <textarea
+          id="msg-input"
+          rows="1"
+          placeholder="Digite sua mensagem... (Enter para enviar, Shift+Enter para nova linha)"
+          onkeydown="handleKey(event)"
+          oninput="autoResize(this)"
+        ></textarea>
+        <button id="send-btn" onclick="sendMessage()" title="Enviar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
+        </button>
+      </div>
+      <div class="text-center mt-2">
+        <span class="text-xs text-gray-600">RESPAD pode cometer erros. Verifique informações críticas com a doutrina oficial.</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ JAVASCRIPT ═══════════════════════════════ -->
+<script>
+  // ─── State ───────────────────────────────────────────────────────────────
+  let messages = [];
+  let isStreaming = false;
+  let currentDocType = null;
+  let currentTitle = 'Início';
+
+  // ─── Doc prompts ─────────────────────────────────────────────────────────
+  const DOC_PROMPTS = {
+    plano: '/novo-plano — Preciso elaborar um Plano de Operações completo conforme doutrina RESPAD/SCI. Por favor, inicie o protocolo de coleta de dados.',
+    ordem: '/nova-ordem — Preciso elaborar uma Ordem de Operações SCI para um período operacional específico. Inicie o protocolo de coleta de dados.',
+    aar:   '/novo-relatorio — Preciso elaborar um Relatório Pós-Ação (AAR) de uma operação concluída. Inicie o protocolo de coleta de dados.',
+    caso:  '/novo-caso — Preciso criar um Caso Prático para treinamento de equipes RESPAD. Inicie o protocolo de coleta de dados.',
+    aula:  '/nova-aula — Preciso estruturar material didático/aula sobre resposta a desastres no padrão CBMAL. Inicie o protocolo de coleta de dados.'
+  };
+
+  const DOC_TITLES = {
+    plano: 'Plano de Operações',
+    ordem: 'Ordem SCI',
+    aar:   'Relatório AAR',
+    caso:  'Caso Prático',
+    aula:  'Material Didático'
+  };
+
+  const NAV_IDS = {
+    plano: 'nav-plano',
+    ordem: 'nav-ordem',
+    aar:   'nav-aar',
+    caso:  'nav-caso',
+    aula:  'nav-aula'
+  };
+
+  // ─── Helpers ─────────────────────────────────────────────────────────────
+  function setActiveNav(id) {
+    document.querySelectorAll('.sidebar-item').forEach(function(el) {
+      el.classList.remove('active');
+    });
+    var el = document.getElementById(id);
+    if (el) el.classList.add('active');
+  }
+
+  function autoResize(textarea) {
+    textarea.style.height = 'auto';
+    var newHeight = Math.min(textarea.scrollHeight, 160);
+    textarea.style.height = newHeight + 'px';
+  }
+
+  function scrollToBottom() {
+    var container = document.getElementById('chat-container');
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function hideWelcome() {
+    var wc = document.getElementById('welcome-card');
+    if (wc) wc.style.display = 'none';
+  }
+
+  function showExportBtn() {
+    var btn = document.getElementById('export-btn');
+    btn.classList.add('visible');
+  }
+
+  function hideExportBtn() {
+    var btn = document.getElementById('export-btn');
+    btn.classList.remove('visible');
+  }
+
+  function renderMarkdown(text) {
+    if (typeof marked !== 'undefined') {
+      marked.setOptions({ breaks: true, gfm: true });
+      return marked.parse(text);
+    }
+    return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+  }
+
+  // ─── selectDoc ───────────────────────────────────────────────────────────
+  function selectDoc(type) {
+    currentDocType = type;
+    currentTitle = DOC_TITLES[type] || 'Assistente';
+    document.getElementById('page-title').textContent = currentTitle;
+
+    setActiveNav(NAV_IDS[type]);
+
+    var input = document.getElementById('msg-input');
+    input.value = DOC_PROMPTS[type];
+    autoResize(input);
+    input.focus();
+  }
+
+  // ─── clearChat ───────────────────────────────────────────────────────────
+  function clearChat() {
+    messages = [];
+    currentDocType = null;
+    currentTitle = 'Início';
+    document.getElementById('page-title').textContent = 'Início';
+
+    setActiveNav('nav-inicio');
+    hideExportBtn();
+
+    var container = document.getElementById('chat-container');
+    container.innerHTML = '';
+
+    // Re-create welcome card
+    var wc = document.createElement('div');
+    wc.id = 'welcome-card';
+    wc.innerHTML = [
+      '<img src="/assets/brasao.png" alt="CBMAL" class="w-20 h-20 object-contain mx-auto mb-4 drop-shadow-lg" onerror="this.style.display=\'none\'" />',
+      '<h1 class="text-2xl font-extrabold text-white mb-1">Olá, sou o RESPAD</h1>',
+      '<p class="text-gray-400 text-sm mb-6">Seu assistente inteligente para documentação operacional do <span class="text-orange-400 font-semibold">CBMAL</span>. Selecione um documento ou faça uma pergunta.</p>',
+      '<div class="flex flex-wrap justify-center gap-1">',
+        '<span class="shortcut-badge" onclick="selectDoc(\'plano\')">📋 Plano de Operações</span>',
+        '<span class="shortcut-badge" onclick="selectDoc(\'ordem\')">📄 Ordem SCI</span>',
+        '<span class="shortcut-badge" onclick="selectDoc(\'aar\')">📊 Relatório AAR</span>',
+        '<span class="shortcut-badge" onclick="selectDoc(\'caso\')">🎯 Caso Prático</span>',
+        '<span class="shortcut-badge" onclick="selectDoc(\'aula\')">📚 Material Didático</span>',
+      '</div>'
+    ].join('');
+    wc.style.cssText = 'margin:auto;text-align:center;max-width:520px;padding:32px 24px;';
+    container.appendChild(wc);
+
+    var input = document.getElementById('msg-input');
+    input.value = '';
+    autoResize(input);
+  }
+
+  // ─── addUserBubble ────────────────────────────────────────────────────────
+  function addUserBubble(text) {
+    var container = document.getElementById('chat-container');
+    var wrapper = document.createElement('div');
+    wrapper.className = 'chat chat-end';
+    var bubble = document.createElement('div');
+    bubble.className = 'chat-bubble chat-bubble-user';
+    bubble.textContent = text;
+    wrapper.appendChild(bubble);
+    container.appendChild(wrapper);
+    scrollToBottom();
+  }
+
+  // ─── addAssistantBubble ───────────────────────────────────────────────────
+  function addAssistantBubble() {
+    var container = document.getElementById('chat-container');
+    var wrapper = document.createElement('div');
+    wrapper.className = 'chat chat-start';
+    wrapper.id = 'streaming-bubble';
+
+    var avatarDiv = document.createElement('div');
+    avatarDiv.className = 'chat-image avatar';
+    var avatarInner = document.createElement('div');
+    avatarInner.style.cssText = 'width:32px;height:32px;border-radius:50%;background:#1a1a2e;border:1px solid rgba(193,10,10,0.4);display:flex;align-items:center;justify-content:center;overflow:hidden;';
+    var avatarImg = document.createElement('img');
+    avatarImg.src = '/assets/brasao.png';
+    avatarImg.style.cssText = 'width:24px;height:24px;object-fit:contain;';
+    avatarImg.onerror = function() {
+      avatarInner.innerHTML = '<span style="color:#C10A0A;font-weight:700;font-size:10px;">R</span>';
+    };
+    avatarInner.appendChild(avatarImg);
+    avatarDiv.appendChild(avatarInner);
+
+    var bubble = document.createElement('div');
+    bubble.className = 'chat-bubble chat-bubble-assistant prose-custom';
+    bubble.id = 'streaming-content';
+
+    // Typing indicator
+    var typing = document.createElement('div');
+    typing.className = 'typing-indicator';
+    typing.id = 'typing-dots';
+    typing.innerHTML = '<span></span><span></span><span></span>';
+    bubble.appendChild(typing);
+
+    wrapper.appendChild(avatarDiv);
+    wrapper.appendChild(bubble);
+    container.appendChild(wrapper);
+    scrollToBottom();
+    return bubble;
+  }
+
+  // ─── handleKey ───────────────────────────────────────────────────────────
+  function handleKey(event) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      sendMessage();
+    }
+  }
+
+  // ─── sendMessage ─────────────────────────────────────────────────────────
+  async function sendMessage() {
+    if (isStreaming) return;
+
+    var input = document.getElementById('msg-input');
+    var text = input.value.trim();
+    if (!text) return;
+
+    // Hide welcome card
+    hideWelcome();
+
+    // Add to history
+    messages.push({ role: 'user', content: text });
+
+    // Add user bubble
+    addUserBubble(text);
+
+    // Clear input
+    input.value = '';
+    autoResize(input);
+
+    // Disable send
+    isStreaming = true;
+    document.getElementById('send-btn').disabled = true;
+
+    // Add assistant bubble with typing indicator
+    var bubble = addAssistantBubble();
+
+    var fullText = '';
+
+    try {
+      var response = await fetch('/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: messages })
+      });
+
+      if (!response.ok) {
+        throw new Error('HTTP ' + response.status + ': ' + response.statusText);
+      }
+
+      var reader = response.body.getReader();
+      var decoder = new TextDecoder('utf-8');
+      var buffer = '';
+
+      // Remove typing dots once first chunk arrives
+      var typingRemoved = false;
+
+      while (true) {
+        var result = await reader.read();
+        if (result.done) break;
+
+        buffer += decoder.decode(result.value, { stream: true });
+        var lines = buffer.split('\n');
+        buffer = lines.pop(); // keep incomplete line
+
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i].trim();
+          if (!line.startsWith('data:')) continue;
+
+          var jsonStr = line.slice(5).trim();
+          if (!jsonStr) continue;
+
+          var data;
+          try {
+            data = JSON.parse(jsonStr);
+          } catch (e) {
+            continue;
+          }
+
+          if (data.done) {
+            // Done
+            break;
+          }
+
+          if (data.text) {
+            // Remove typing dots on first real content
+            if (!typingRemoved) {
+              var dots = document.getElementById('typing-dots');
+              if (dots) dots.remove();
+              typingRemoved = true;
+            }
+            fullText += data.text;
+            bubble.innerHTML = renderMarkdown(fullText);
+            scrollToBottom();
+          }
+        }
+      }
+
+      // Handle any remaining buffer
+      if (buffer.trim().startsWith('data:')) {
+        var jsonStr2 = buffer.trim().slice(5).trim();
+        if (jsonStr2) {
+          try {
+            var data2 = JSON.parse(jsonStr2);
+            if (data2.text) {
+              if (!typingRemoved) {
+                var dots2 = document.getElementById('typing-dots');
+                if (dots2) dots2.remove();
+              }
+              fullText += data2.text;
+              bubble.innerHTML = renderMarkdown(fullText);
+            }
+          } catch (e) { /* ignore */ }
+        }
+      }
+
+      // Remove typing if still present (empty response)
+      var remainingDots = document.getElementById('typing-dots');
+      if (remainingDots) {
+        remainingDots.remove();
+        if (!fullText) bubble.textContent = '(sem resposta)';
+      }
+
+    } catch (err) {
+      var dots3 = document.getElementById('typing-dots');
+      if (dots3) dots3.remove();
+      bubble.innerHTML = '<span style="color:#f87171;">Erro ao conectar com o servidor: ' + err.message + '</span>';
+      fullText = '';
+    }
+
+    // Remove streaming id
+    var streamingBubble = document.getElementById('streaming-bubble');
+    if (streamingBubble) streamingBubble.removeAttribute('id');
+    var streamingContent = document.getElementById('streaming-content');
+    if (streamingContent) streamingContent.removeAttribute('id');
+
+    // Add assistant message to history
+    if (fullText) {
+      messages.push({ role: 'assistant', content: fullText });
+    }
+
+    // Show export button
+    if (messages.length > 0) showExportBtn();
+
+    // Re-enable send
+    isStreaming = false;
+    document.getElementById('send-btn').disabled = false;
+    scrollToBottom();
+  }
+
+  // ─── exportDoc ───────────────────────────────────────────────────────────
+  async function exportDoc() {
+    if (messages.length === 0) return;
+
+    try {
+      var response = await fetch('/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: messages, title: currentTitle })
+      });
+
+      if (!response.ok) {
+        throw new Error('Exportação falhou: ' + response.statusText);
+      }
+
+      var blob = await response.blob();
+      var url = window.URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+
+      // Try to get filename from Content-Disposition header
+      var disposition = response.headers.get('Content-Disposition');
+      var filename = 'RESPAD_' + currentTitle.replace(/\s+/g, '_') + '.docx';
+      if (disposition) {
+        var match = disposition.match(/filename[^;=\n]*=(['"]?)([^'";\n]*)\1/);
+        if (match && match[2]) filename = match[2];
+      }
+
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+    } catch (err) {
+      alert('Erro ao exportar: ' + err.message);
+    }
+  }
+</script>
+
+</body>
+</html>
