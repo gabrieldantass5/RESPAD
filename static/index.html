@@ -59,6 +59,46 @@
       border-right: 1px solid rgba(193,10,10,0.25);
       overflow-y: auto;
       overflow-x: hidden;
+      transition: transform 0.3s ease;
+      z-index: 100;
+    }
+
+    /* ─── Mobile sidebar overlay ─── */
+    #sidebar-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 99;
+    }
+    #sidebar-backdrop.active { display: block; }
+
+    /* ─── Hamburger button ─── */
+    #hamburger {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      cursor: pointer;
+      background: rgba(193,10,10,0.15);
+      border: 1px solid rgba(193,10,10,0.3);
+      color: #fff;
+      flex-shrink: 0;
+    }
+    #hamburger:hover { background: rgba(193,10,10,0.3); }
+
+    @media (max-width: 768px) {
+      #hamburger { display: flex; }
+      #sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        transform: translateX(-100%);
+      }
+      #sidebar.open { transform: translateX(0); }
     }
 
     /* ─── Main chat area ─── */
@@ -443,12 +483,21 @@
 
   </aside>
 
+  <!-- Mobile backdrop -->
+  <div id="sidebar-backdrop" onclick="closeSidebar()"></div>
+
   <!-- ═══════════════════════════════ MAIN ═══════════════════════════════ -->
   <div id="main">
 
     <!-- Top bar -->
     <div id="topbar">
       <div class="flex items-center gap-2">
+        <!-- Hamburger (mobile only) -->
+        <button id="hamburger" onclick="toggleSidebar()" aria-label="Menu">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
         <span class="text-xs text-gray-500">Assistente RESPAD</span>
         <span class="text-gray-600 text-xs">›</span>
         <span id="page-title" class="text-sm font-semibold text-white">Início</span>
@@ -590,6 +639,19 @@
     input.value = DOC_PROMPTS[type];
     autoResize(input);
     input.focus();
+    closeSidebar();
+  }
+
+  // ─── Mobile sidebar ──────────────────────────────────────────────────────
+  function toggleSidebar() {
+    var sidebar = document.getElementById('sidebar');
+    var backdrop = document.getElementById('sidebar-backdrop');
+    sidebar.classList.toggle('open');
+    backdrop.classList.toggle('active');
+  }
+  function closeSidebar() {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sidebar-backdrop').classList.remove('active');
   }
 
   // ─── clearChat ───────────────────────────────────────────────────────────
@@ -601,6 +663,7 @@
 
     setActiveNav('nav-inicio');
     hideExportBtn();
+    closeSidebar();
 
     var container = document.getElementById('chat-container');
     container.innerHTML = '';
